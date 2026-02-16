@@ -292,7 +292,7 @@ const App: React.FC = () => {
         {view === 'PUBLIC' && (
           <div className="w-full px-6 lg:px-12 py-20">
             <div className="mb-12 text-center">
-              <h1 className="text-4xl lg:text-5xl font-extrabold text-slate-900 mb-4 tracking-tight">Cresci con noi</h1>
+              <h1 className="text-4xl lg:text-5xl font-extrabold text-slate-900 mb-4 tracking-tight">Lavora con noi</h1>
               <p className="text-lg text-slate-600 max-w-2xl mx-auto">Sfoglia le nostre posizioni aperte e trova la tua prossima sfida professionale.</p>
             </div>
             
