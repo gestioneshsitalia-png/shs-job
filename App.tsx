@@ -234,7 +234,11 @@ const App: React.FC = () => {
                 email: appData.email,
                 phone: appData.phone,
                 message: appData.coverLetter,
-                consentGiven: appData.consentGiven
+                consentGiven: appData.consentGiven,
+                cv: {
+                  fileName: appData.cvFileName,
+                  data: appData.cvBase64
+                }
               },
               job: {
                 title: job?.title,
