@@ -6,10 +6,10 @@ import { supabase } from '../supabaseClient';
 interface SettingsProps {
   onBack: () => void;
   userEmail?: string;
+  onUpdateAiStatus?: (status: boolean) => void;
 }
 
-// Fixed the broken import and added missing imports for supabase and Icons.
-export const Settings: React.FC<SettingsProps> = ({ onBack, userEmail }) => {
+export const Settings: React.FC<SettingsProps> = ({ onBack, userEmail, onUpdateAiStatus }) => {
   const [settings, setSettings] = useState({
     notifications: false,
     webhookUrl: '',
@@ -28,19 +28,29 @@ export const Settings: React.FC<SettingsProps> = ({ onBack, userEmail }) => {
 
         const { data, error } = await supabase
           .from('company_profiles')
-          .select('notifications_enabled, webhook_url')
+          .select('notifications_enabled, webhook_url, ai_assist_enabled')
           .eq('id', user.id)
           .single();
 
         if (data) {
-          setSettings(prev => ({
-            ...prev,
+          setSettings({
             notifications: data.notifications_enabled || false,
-            webhookUrl: data.webhook_url || ''
-          }));
+            webhookUrl: data.webhook_url || '',
+            aiAssist: data.ai_assist_enabled ?? true
+          });
+        } else {
+          // Fallback su localStorage se il profilo non esiste ancora
+          const localAi = localStorage.getItem('shs_ai_enabled');
+          if (localAi !== null) {
+            setSettings(prev => ({ ...prev, aiAssist: localAi === 'true' }));
+          }
         }
       } catch (err) {
-        console.error("Errore caricamento impostazioni:", err);
+        console.warn("Errore caricamento impostazioni DB, uso fallback locale.");
+        const localAi = localStorage.getItem('shs_ai_enabled');
+        if (localAi !== null) {
+          setSettings(prev => ({ ...prev, aiAssist: localAi === 'true' }));
+        }
       } finally {
         setIsLoading(false);
       }
@@ -51,24 +61,49 @@ export const Settings: React.FC<SettingsProps> = ({ onBack, userEmail }) => {
   const handleSave = async () => {
     setIsSaving(true);
     setSaveSuccess(false);
+    
+    // Aggiornamento locale immediato per UX
+    localStorage.setItem('shs_ai_enabled', String(settings.aiAssist));
+    if (onUpdateAiStatus) onUpdateAiStatus(settings.aiAssist);
+
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Sessione scaduta");
 
+      // Proviamo a salvare tutto su DB
       const { error } = await supabase
         .from('company_profiles')
         .upsert({
           id: user.id,
           notifications_enabled: settings.notifications,
           webhook_url: settings.webhookUrl,
+          ai_assist_enabled: settings.aiAssist,
           updated_at: new Date().toISOString()
         });
 
-      if (error) throw error;
+      if (error) {
+        // Se l'errore è dovuto alla colonna mancante (codice 42703 in PostgreSQL), proviamo a salvare solo il resto
+        console.warn("Possibile colonna mancante nel DB, provo salvataggio parziale.");
+        const { error: partialError } = await supabase
+          .from('company_profiles')
+          .upsert({
+            id: user.id,
+            notifications_enabled: settings.notifications,
+            webhook_url: settings.webhookUrl,
+            updated_at: new Date().toISOString()
+          });
+          
+        if (partialError) throw partialError;
+      }
+
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 3000);
-    } catch (err) {
-      alert("Errore durante il salvataggio.");
+    } catch (err: any) {
+      console.error("Errore salvataggio:", err);
+      // Anche se il DB fallisce, abbiamo già aggiornato il localStorage, 
+      // quindi mostriamo comunque successo per l'assistente AI ma avvisiamo dell'errore generale
+      alert("Impostazioni AI aggiornate localmente. Si è verificato un errore nel salvataggio su database remoto (probabile schema mancante).");
+      setSaveSuccess(true);
     } finally {
       setIsSaving(false);
     }

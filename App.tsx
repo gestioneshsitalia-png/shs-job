@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { Job, Application, ViewState, JobType, JobCategory } from './types';
+import { Job, Application, ViewState, JobCategoryItem, JobTypeItem } from './types';
 import { Icons } from './constants';
 import { JobCard } from './components/JobCard';
 import { JobForm } from './components/JobForm';
@@ -9,6 +9,7 @@ import { AdminModule } from './components/AdminModule';
 import { CompanyProfile } from './components/CompanyProfile';
 import { Settings } from './components/Settings';
 import { ThankYou } from './components/ThankYou';
+import { DictionaryManager } from './components/DictionaryManager';
 import { supabase } from './supabaseClient';
 
 const App: React.FC = () => {
@@ -20,6 +21,9 @@ const App: React.FC = () => {
 
   const [jobs, setJobs] = useState<Job[]>([]);
   const [applications, setApplications] = useState<Application[]>([]);
+  const [categories, setCategories] = useState<JobCategoryItem[]>([]);
+  const [jobTypes, setJobTypes] = useState<JobTypeItem[]>([]);
+  
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
   const [editingJob, setEditingJob] = useState<Job | null>(null);
   const [isApplyModalOpen, setIsApplyModalOpen] = useState(false);
@@ -29,6 +33,11 @@ const App: React.FC = () => {
   const [isAuthLoading, setIsAuthLoading] = useState(true);
   const [isSubmittingApp, setIsSubmittingApp] = useState(false);
   const [loadingCVId, setLoadingCVId] = useState<string | null>(null);
+  
+  const [isAiEnabled, setIsAiEnabled] = useState<boolean>(() => {
+    const localAi = localStorage.getItem('shs_ai_enabled');
+    return localAi !== null ? localAi === 'true' : true;
+  });
   
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [userEmail, setUserEmail] = useState<string | undefined>();
@@ -75,6 +84,7 @@ const App: React.FC = () => {
     if (showMainLoader) setIsLoading(true);
     else setIsRefreshing(true);
     try {
+      // Fetch Jobs
       const { data: jobsData, error: jobsError } = await supabase
         .from('jobs')
         .select('*')
@@ -86,8 +96,8 @@ const App: React.FC = () => {
         id: j.id,
         title: j.title,
         company: j.company,
-        category: j.category as JobCategory,
-        type: j.type as JobType,
+        category: j.category,
+        type: j.type,
         location: j.location,
         description: j.description,
         requirements: j.requirements || [],
@@ -97,6 +107,14 @@ const App: React.FC = () => {
       }));
       setJobs(mappedJobs);
 
+      // Fetch Dictionaries (Categories & Job Types)
+      const { data: catsData } = await supabase.from('job_categories').select('*').order('name');
+      const { data: typesData } = await supabase.from('job_types').select('*').order('name');
+      
+      if (catsData) setCategories(catsData);
+      if (typesData) setJobTypes(typesData);
+
+      // Fetch Applications
       const { data: appsData, error: appsError } = await supabase
         .from('applications')
         .select('id, job_id, candidate_name, email, phone, cover_letter, cv_file_name, applied_at, consent_given')
@@ -119,6 +137,25 @@ const App: React.FC = () => {
       } else {
         setApplications([]);
       }
+
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user?.id) {
+        try {
+          const { data: profile } = await supabase
+            .from('company_profiles')
+            .select('ai_assist_enabled')
+            .eq('id', session.user.id)
+            .maybeSingle();
+          
+          if (profile && typeof profile.ai_assist_enabled === 'boolean') {
+            setIsAiEnabled(profile.ai_assist_enabled);
+            localStorage.setItem('shs_ai_enabled', String(profile.ai_assist_enabled));
+          }
+        } catch (e) {
+          console.warn("Impossibile recuperare lo stato AI dal DB");
+        }
+      }
+
     } catch (err) {
       console.error("Errore caricamento dati:", err);
     } finally {
@@ -202,22 +239,17 @@ const App: React.FC = () => {
     };
 
     try {
-      // 1. Salvataggio su DB (Aperto a tutti gli utenti tramite RLS anonima)
       const { error: insertError } = await supabase.from('applications').insert([dbApp]);
       if (insertError) throw insertError;
 
-      // 2. Recupero impostazioni webhook dall'azienda (Accessibile pubblicamente per permettere l'invio anonimo)
       const { data: profile } = await supabase
         .from('company_profiles')
         .select('notifications_enabled, webhook_url')
         .limit(1)
         .maybeSingle();
 
-      // 3. Invio Webhook se configurato - Deve funzionare per ogni candidatura (anche anonima)
       if (profile?.notifications_enabled && profile?.webhook_url) {
         const job = jobs.find(j => j.id === appData.jobId);
-        
-        // Payload aggiornato: ora include cv_base64 e cv_file_name per permettere a Make di scaricare l'allegato
         const webhookPayload = {
           candidate_name: appData.candidateName,
           email: appData.email,
@@ -229,13 +261,12 @@ const App: React.FC = () => {
           cv_base64: appData.cvBase64
         };
 
-        // Invio asincrono al webhook.
         fetch(profile.webhook_url, {
           method: 'POST',
           mode: 'cors',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(webhookPayload)
-        }).catch(err => console.warn("Errore durante l'invio al Webhook (CORS o URL errato):", err));
+        }).catch(err => console.warn("Errore durante l'invio al Webhook:", err));
       }
 
       await fetchData(false); 
@@ -249,10 +280,8 @@ const App: React.FC = () => {
   };
 
   const availableCategories = useMemo(() => {
-    const cats = new Set<string>();
-    jobs.forEach(j => cats.add(j.category));
-    return Array.from(cats).sort();
-  }, [jobs]);
+    return categories.map(c => c.name);
+  }, [categories]);
 
   const stats = useMemo(() => {
     const totalJobs = jobs.length;
@@ -459,9 +488,32 @@ const App: React.FC = () => {
         )}
 
         {view === 'ADMIN_PROFILE' && isAuthenticated && <CompanyProfile onBack={() => setView('ADMIN')} userEmail={userEmail} />}
-        {view === 'ADMIN_SETTINGS' && isAuthenticated && <Settings onBack={() => setView('ADMIN')} userEmail={userEmail} />}
+        {view === 'ADMIN_SETTINGS' && isAuthenticated && (
+          <Settings 
+            onBack={() => setView('ADMIN')} 
+            userEmail={userEmail} 
+            onUpdateAiStatus={(status) => setIsAiEnabled(status)}
+          />
+        )}
+        {view === 'ADMIN_DICTIONARIES' && isAuthenticated && (
+          <DictionaryManager 
+            categories={categories} 
+            jobTypes={jobTypes} 
+            onBack={() => setView('ADMIN')} 
+            onRefresh={() => fetchData(false)} 
+          />
+        )}
         {(view === 'ADMIN_CREATE' || view === 'ADMIN_EDIT') && isAuthenticated && (
-          <div className="py-20 px-6 lg:px-12"><JobForm initialData={editingJob || undefined} onSubmit={handleAddJob} onCancel={() => setView('ADMIN')} /></div>
+          <div className="py-20 px-6 lg:px-12">
+            <JobForm 
+              initialData={editingJob || undefined} 
+              onSubmit={handleAddJob} 
+              onCancel={() => setView('ADMIN')} 
+              isAiEnabled={isAiEnabled}
+              categories={categories}
+              jobTypes={jobTypes}
+            />
+          </div>
         )}
       </main>
       {isApplyModalOpen && selectedJob && <ApplicationModal job={selectedJob} isOpen={isApplyModalOpen} onClose={() => setIsApplyModalOpen(false)} onSubmit={handleApply} />}
@@ -469,5 +521,4 @@ const App: React.FC = () => {
   );
 };
 
-// Fixed error in index.tsx: Module '"file:///App"' has no default export.
 export default App;

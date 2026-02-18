@@ -10,7 +10,6 @@ interface AdminModuleProps {
   onLogout: () => void;
   onCreateJob: () => void;
   onViewApplications: () => void;
-  // Added Job type to parameter to fix implicit any error
   onEditJob: (job: Job) => void;
   onRemoveJob: (id: string) => void;
   onNavigate: (view: ViewState) => void;
@@ -106,7 +105,7 @@ export const AdminModule: React.FC<AdminModuleProps> = ({
         
         const label = currentStart.toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit' });
         const count = applications.filter(app => {
-          const appDate = new Date(currentStart); // Corrected to use currentStart for range check
+          const appDate = new Date(currentStart);
           return appDate >= currentStart && appDate < currentEnd;
         }).length;
         periods.push({ label, count });
@@ -161,6 +160,7 @@ export const AdminModule: React.FC<AdminModuleProps> = ({
                 </div>
                 <div className="p-2">
                   <button onClick={() => { onNavigate('ADMIN_PROFILE'); setIsMenuOpen(false); }} className="w-full flex items-center gap-3 px-3 py-2.5 text-sm text-slate-600 hover:bg-slate-50 hover:text-brand transition-colors text-left"><Icons.User /> Profilo Aziendale</button>
+                  <button onClick={() => { onNavigate('ADMIN_DICTIONARIES'); setIsMenuOpen(false); }} className="w-full flex items-center gap-3 px-3 py-2.5 text-sm text-slate-600 hover:bg-slate-50 hover:text-brand transition-colors text-left"><Icons.Briefcase /> Gestisci Liste</button>
                   <button onClick={() => { onNavigate('ADMIN_SETTINGS'); setIsMenuOpen(false); }} className="w-full flex items-center gap-3 px-3 py-2.5 text-sm text-slate-600 hover:bg-slate-50 hover:text-brand transition-colors text-left"><Icons.Settings /> Impostazioni SaaS</button>
                 </div>
                 <div className="p-2 border-t border-slate-100">
