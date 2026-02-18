@@ -20,6 +20,7 @@ export const ApplicationModal: React.FC<ApplicationModalProps> = ({ job, isOpen,
     consentGiven: false
   });
   const [cvBase64, setCvBase64] = useState('');
+  const [attemptedSubmit, setAttemptedSubmit] = useState(false);
 
   if (!isOpen) return null;
 
@@ -37,14 +38,17 @@ export const ApplicationModal: React.FC<ApplicationModalProps> = ({ job, isOpen,
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    setAttemptedSubmit(true);
+    
     if (!cvBase64) {
-      alert("Carica il tuo CV prima di inviare.");
       return;
     }
+    
     if (!formData.consentGiven) {
       alert("È necessario accettare il trattamento dei dati personali per procedere.");
       return;
     }
+    
     onSubmit({
       ...formData,
       jobId: job.id,
@@ -91,26 +95,40 @@ export const ApplicationModal: React.FC<ApplicationModalProps> = ({ job, isOpen,
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-sm font-semibold text-slate-700">Telefono</label>
+            <label className="text-sm font-semibold text-slate-700">Telefono (solo numeri)</label>
             <input
               required
+              type="tel"
               className="w-full px-4 py-2.5 border border-slate-200 focus:ring-2 focus:ring-brand outline-none"
-              placeholder="+39 333 1234567"
+              placeholder="es. 3331234567"
               value={formData.phone}
-              onChange={e => setFormData({ ...formData, phone: e.target.value })}
+              onChange={e => {
+                const val = e.target.value.replace(/\D/g, '');
+                setFormData({ ...formData, phone: val });
+              }}
             />
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-sm font-semibold text-slate-700">Carica CV (PDF o DOC)</label>
-            <div className="flex items-center gap-4">
-              <label className="cursor-pointer bg-slate-100 px-6 py-2.5 border border-dashed border-slate-300 hover:bg-slate-200 transition-colors text-slate-600 font-medium">
-                Scegli file
-                <input type="file" className="hidden" accept=".pdf,.doc,.docx" onChange={handleFileChange} />
-              </label>
-              <span className="text-sm text-slate-500 italic">
-                {formData.cvFileName || 'Nessun file selezionato'}
-              </span>
+            <label className="text-sm font-semibold text-slate-700 flex items-center gap-1.5">
+              Carica CV (PDF o DOC) <span className="text-red-500">*</span>
+            </label>
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center gap-4">
+                <label className={`cursor-pointer px-6 py-2.5 border border-dashed hover:bg-slate-200 transition-colors font-medium ${attemptedSubmit && !cvBase64 ? 'bg-red-50 border-red-300 text-red-600' : 'bg-slate-100 border-slate-300 text-slate-600'}`}>
+                  Scegli file
+                  <input type="file" className="hidden" accept=".pdf,.doc,.docx" onChange={handleFileChange} />
+                </label>
+                <span className="text-sm text-slate-500 italic">
+                  {formData.cvFileName || 'Nessun file selezionato'}
+                </span>
+              </div>
+              {attemptedSubmit && !cvBase64 && (
+                <p className="text-xs font-bold text-red-500 animate-pulse flex items-center gap-1">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></svg>
+                  È obbligatorio caricare il curriculum per procedere.
+                </p>
+              )}
             </div>
           </div>
 
