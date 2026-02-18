@@ -14,6 +14,7 @@ import { supabase } from './supabaseClient';
 const App: React.FC = () => {
   const [view, setView] = useState<ViewState>(() => {
     const savedView = localStorage.getItem('shs_job_view');
+    // Sanitize saved view: if it's a detail view, we'll check consistency in useEffect
     return (savedView as ViewState) || 'PUBLIC';
   });
 
@@ -41,6 +42,13 @@ const App: React.FC = () => {
   useEffect(() => {
     localStorage.setItem('shs_job_view', view);
   }, [view]);
+
+  // Safeguard: Se la vista salvata nel localStorage richiede un selectedJob che non esiste (tipico al refresh), torna alla home
+  useEffect(() => {
+    if ((view === 'JOB_DETAILS' || view === 'THANK_YOU') && !selectedJob) {
+      setView('PUBLIC');
+    }
+  }, [view, selectedJob]);
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -77,7 +85,6 @@ const App: React.FC = () => {
         .select('*')
         .order('posted_at', { ascending: false });
       
-      // Gestione errore colonna is_featured mancante in lettura
       if (jobsError) throw jobsError;
 
       const { data: appsData, error: appsError } = await supabase
@@ -109,7 +116,7 @@ const App: React.FC = () => {
         cvFileName: a.cv_file_name,
         cvBase64: a.cv_base64,
         appliedAt: a.applied_at,
-        consent_given: a.consent_given || false
+        consentGiven: a.consent_given || false
       }));
 
       setJobs(mappedJobs);
