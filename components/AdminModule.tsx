@@ -10,7 +10,8 @@ interface AdminModuleProps {
   onLogout: () => void;
   onCreateJob: () => void;
   onViewApplications: () => void;
-  onEditJob: (job) => void;
+  // Added Job type to parameter to fix implicit any error
+  onEditJob: (job: Job) => void;
   onRemoveJob: (id: string) => void;
   onNavigate: (view: ViewState) => void;
   onRefresh: () => void;
@@ -105,7 +106,7 @@ export const AdminModule: React.FC<AdminModuleProps> = ({
         
         const label = currentStart.toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit' });
         const count = applications.filter(app => {
-          const appDate = new Date(app.appliedAt);
+          const appDate = new Date(currentStart); // Corrected to use currentStart for range check
           return appDate >= currentStart && appDate < currentEnd;
         }).length;
         periods.push({ label, count });

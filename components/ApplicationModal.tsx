@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Job, Application } from '../types';
 import { Icons } from '../constants';
 
@@ -22,6 +22,29 @@ export const ApplicationModal: React.FC<ApplicationModalProps> = ({ job, isOpen,
   const [cvBase64, setCvBase64] = useState('');
   const [attemptedSubmit, setAttemptedSubmit] = useState(false);
 
+  // Blocco dello scroll della pagina sottostante quando il modal è aperto
+  useEffect(() => {
+    const html = document.documentElement;
+    const body = document.body;
+    
+    if (isOpen) {
+      const scrollBarWidth = window.innerWidth - html.clientWidth;
+      html.style.overflow = 'hidden';
+      body.style.overflow = 'hidden';
+      body.style.paddingRight = `${scrollBarWidth}px`;
+    } else {
+      html.style.overflow = '';
+      body.style.overflow = '';
+      body.style.paddingRight = '';
+    }
+    
+    return () => {
+      html.style.overflow = '';
+      body.style.overflow = '';
+      body.style.paddingRight = '';
+    };
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -40,10 +63,11 @@ export const ApplicationModal: React.FC<ApplicationModalProps> = ({ job, isOpen,
     e.preventDefault();
     setAttemptedSubmit(true);
     
-    if (!cvBase64) {
+    if (!formData.cvFileName || !cvBase64) {
+      alert("Il caricamento del CV è obbligatorio per procedere con la candidatura.");
       return;
     }
-    
+
     if (!formData.consentGiven) {
       alert("È necessario accettare il trattamento dei dati personali per procedere.");
       return;
@@ -60,7 +84,7 @@ export const ApplicationModal: React.FC<ApplicationModalProps> = ({ job, isOpen,
     <div className="fixed inset-0 z-[60] bg-slate-900/60 backdrop-blur-sm overflow-y-auto outline-none">
       <div className="flex min-h-full items-start justify-center p-4 sm:p-6">
         <div className="bg-white w-full max-w-2xl shadow-2xl p-6 sm:p-10 relative animate-in slide-in-from-top-4 duration-300 mt-4 mb-12 sm:my-12">
-          {/* Tasto chiusura migliorato per mobile */}
+          {/* Tasto chiusura migliorato */}
           <button 
             onClick={onClose}
             className="absolute top-3 right-3 sm:top-6 sm:right-6 p-3 text-slate-400 hover:text-slate-900 hover:bg-slate-100 transition-all z-20 rounded-full"
@@ -116,24 +140,18 @@ export const ApplicationModal: React.FC<ApplicationModalProps> = ({ job, isOpen,
 
             <div className="space-y-1.5">
               <label className="text-sm font-semibold text-slate-700 flex items-center gap-1.5">
-                Carica CV (PDF o DOC) <span className="text-red-500">*</span>
+                Carica CV (PDF o DOC) <span className="text-red-500 font-bold">*</span>
               </label>
               <div className="flex flex-col gap-2">
                 <div className="flex flex-col sm:flex-row sm:items-center gap-4">
-                  <label className={`cursor-pointer px-6 py-3 border border-dashed hover:bg-slate-200 transition-colors font-bold text-center sm:text-left ${attemptedSubmit && !cvBase64 ? 'bg-red-50 border-red-300 text-red-600' : 'bg-slate-100 border-slate-300 text-slate-600'}`}>
+                  <label className={`cursor-pointer px-6 py-3 border border-dashed hover:bg-slate-200 transition-colors font-bold text-center sm:text-left bg-slate-100 ${attemptedSubmit && !formData.cvFileName ? 'border-red-500 bg-red-50 text-red-600' : 'border-slate-300 text-slate-600'}`}>
                     Scegli file
                     <input type="file" className="hidden" accept=".pdf,.doc,.docx" onChange={handleFileChange} />
                   </label>
-                  <span className="text-sm text-slate-500 italic truncate max-w-full block">
-                    {formData.cvFileName || 'Nessun file selezionato'}
+                  <span className={`text-sm italic truncate max-w-full block ${attemptedSubmit && !formData.cvFileName ? 'text-red-500 font-bold' : 'text-slate-500'}`}>
+                    {formData.cvFileName || 'Nessun file selezionato (Obbligatorio)'}
                   </span>
                 </div>
-                {attemptedSubmit && !cvBase64 && (
-                  <p className="text-xs font-bold text-red-500 animate-pulse flex items-center gap-1">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></svg>
-                    È obbligatorio caricare il curriculum.
-                  </p>
-                )}
               </div>
             </div>
 
@@ -162,16 +180,11 @@ export const ApplicationModal: React.FC<ApplicationModalProps> = ({ job, isOpen,
                     Dichiaro di aver letto l'<strong>Informativa sulla Privacy</strong> e acconsento al trattamento dei miei dati personali per finalità legate alla selezione del personale (GDPR).
                   </label>
                </div>
-               <div className="flex items-center gap-2 text-[10px] text-brand font-bold uppercase tracking-wider">
-                  <Icons.Sparkles />
-                  I tuoi dati sono criptati e sicuri.
-               </div>
             </div>
 
             <div className="pt-2">
               <button
                 type="submit"
-                disabled={!formData.consentGiven}
                 className="w-full py-5 bg-brand text-white font-bold text-lg hover:bg-brand-dark transition-all shadow-xl shadow-brand/20 disabled:opacity-50 disabled:grayscale uppercase tracking-widest active:scale-[0.98]"
               >
                 Invia Candidatura
