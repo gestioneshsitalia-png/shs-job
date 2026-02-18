@@ -151,7 +151,6 @@ const App: React.FC = () => {
       setEditingJob(null);
       setView('ADMIN');
     } catch (err: any) {
-      // Se l'errore è dovuto alla colonna is_featured mancante
       if (err.code === 'PGRST204' || (err.message && err.message.includes('is_featured'))) {
         console.warn("Colonna 'is_featured' non trovata. Riprovo senza...");
         delete dbJob.is_featured;
@@ -193,7 +192,6 @@ const App: React.FC = () => {
       const { error: insertError } = await supabase.from('applications').insert([dbApp]);
 
       if (insertError) {
-        // Fallback se mancano le colonne del CV o del consenso
         if (insertError.code === 'PGRST204') {
           console.warn("Colonne moderne non trovate in 'applications'. Riprovo con schema base...");
           const legacyApp = {
@@ -361,10 +359,20 @@ const App: React.FC = () => {
         </div>
       )}
 
-      <div className="fixed top-6 left-1/2 -translate-x-1/2 z-50">
-        <div className="bg-white/80 backdrop-blur-md border border-slate-200 px-1.5 py-1.5 shadow-xl flex items-center gap-1">
-          <button onClick={() => { setView('PUBLIC'); setSelectedJob(null); }} className={`px-5 py-2 text-sm font-bold transition-all ${view === 'PUBLIC' || view === 'JOB_DETAILS' || view === 'THANK_YOU' ? 'bg-brand text-white shadow-lg shadow-brand/20' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50'}`}>Posizioni Aperte</button>
-          <button onClick={() => setView('ADMIN')} className={`px-5 py-2 text-sm font-bold transition-all ${view.startsWith('ADMIN') ? 'bg-brand text-white shadow-lg shadow-brand/20' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50'}`}>Area Azienda</button>
+      <div className="fixed top-6 left-1/2 -translate-x-1/2 z-50 w-[92vw] sm:w-auto">
+        <div className="bg-white/80 backdrop-blur-md border border-slate-200 px-1 py-1 shadow-xl flex items-center gap-1 w-full sm:w-auto rounded-none">
+          <button 
+            onClick={() => { setView('PUBLIC'); setSelectedJob(null); }} 
+            className={`flex-1 sm:flex-none px-4 sm:px-6 py-2.5 text-xs sm:text-sm font-bold transition-all whitespace-nowrap ${view === 'PUBLIC' || view === 'JOB_DETAILS' || view === 'THANK_YOU' ? 'bg-brand text-white shadow-lg shadow-brand/20' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50'}`}
+          >
+            Posizioni Aperte
+          </button>
+          <button 
+            onClick={() => setView('ADMIN')} 
+            className={`flex-1 sm:flex-none px-4 sm:px-6 py-2.5 text-xs sm:text-sm font-bold transition-all whitespace-nowrap ${view.startsWith('ADMIN') ? 'bg-brand text-white shadow-lg shadow-brand/20' : 'text-slate-500 hover:text-slate-900 hover:bg-slate-50'}`}
+          >
+            Area Azienda
+          </button>
         </div>
       </div>
 
