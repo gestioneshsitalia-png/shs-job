@@ -20,6 +20,16 @@ export const Settings: React.FC<SettingsProps> = ({ onBack, userEmail, onUpdateA
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
 
+  // Password change states
+  const [passwordForm, setPasswordForm] = useState({
+    oldPassword: '',
+    newPassword: '',
+    confirmPassword: ''
+  });
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const [passwordError, setPasswordError] = useState('');
+  const [passwordSuccess, setPasswordSuccess] = useState('');
+
   useEffect(() => {
     const fetchSettings = async () => {
       try {
@@ -106,6 +116,64 @@ export const Settings: React.FC<SettingsProps> = ({ onBack, userEmail, onUpdateA
       setSaveSuccess(true);
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handlePasswordChange = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPasswordError('');
+    setPasswordSuccess('');
+
+    if (!passwordForm.oldPassword || !passwordForm.newPassword || !passwordForm.confirmPassword) {
+      setPasswordError('Tutti i campi sono obbligatori.');
+      return;
+    }
+
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+      setPasswordError('Le nuove password non coincidono.');
+      return;
+    }
+
+    if (passwordForm.newPassword.length < 6) {
+      setPasswordError('La nuova password deve essere di almeno 6 caratteri.');
+      return;
+    }
+
+    setIsChangingPassword(true);
+
+    try {
+      // 1. Verifica la vecchia password ri-autenticando l'utente
+      if (!userEmail) throw new Error("Email utente non disponibile.");
+      
+      const { error: authError } = await supabase.auth.signInWithPassword({
+        email: userEmail,
+        password: passwordForm.oldPassword,
+      });
+
+      if (authError) {
+        setPasswordError('La vecchia password non è corretta.');
+        setIsChangingPassword(false);
+        return;
+      }
+
+      // 2. Aggiorna la password
+      const { error: updateError } = await supabase.auth.updateUser({
+        password: passwordForm.newPassword
+      });
+
+      if (updateError) throw updateError;
+
+      setPasswordSuccess('Password aggiornata con successo!');
+      setPasswordForm({
+        oldPassword: '',
+        newPassword: '',
+        confirmPassword: ''
+      });
+    } catch (err: any) {
+      console.error("Errore cambio password:", err);
+      setPasswordError(err.message || 'Si è verificato un errore durante il cambio password.');
+    } finally {
+      setIsChangingPassword(false);
     }
   };
 
@@ -199,15 +267,72 @@ export const Settings: React.FC<SettingsProps> = ({ onBack, userEmail, onUpdateA
             <p className="text-sm text-slate-500">Gestisci l'accesso e la tua password.</p>
           </div>
           <div className="p-8">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6">
+            <form onSubmit={handlePasswordChange} className="space-y-6">
               <div>
-                <p className="font-bold text-slate-900 text-lg">Cambia Password</p>
-                <p className="text-sm text-slate-500">Invieremo un link di reset all'indirizzo {userEmail}.</p>
+                <p className="font-bold text-slate-900 text-lg mb-4">Cambia Password</p>
+                
+                {passwordError && (
+                  <div className="mb-4 p-4 bg-red-50 border-l-4 border-red-500 text-red-700 text-sm flex items-center gap-2">
+                    <Icons.AlertCircle className="w-4 h-4" />
+                    {passwordError}
+                  </div>
+                )}
+                
+                {passwordSuccess && (
+                  <div className="mb-4 p-4 bg-green-50 border-l-4 border-green-500 text-green-700 text-sm flex items-center gap-2">
+                    <Icons.CheckCircle className="w-4 h-4" />
+                    {passwordSuccess}
+                  </div>
+                )}
+
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Vecchia Password</label>
+                    <input 
+                      type="password"
+                      required
+                      className="w-full px-5 py-3 border border-slate-200 focus:ring-2 focus:ring-brand outline-none text-sm shadow-sm"
+                      placeholder="••••••••"
+                      value={passwordForm.oldPassword}
+                      onChange={e => setPasswordForm({...passwordForm, oldPassword: e.target.value})}
+                    />
+                  </div>
+                  
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Nuova Password</label>
+                      <input 
+                        type="password"
+                        required
+                        className="w-full px-5 py-3 border border-slate-200 focus:ring-2 focus:ring-brand outline-none text-sm shadow-sm"
+                        placeholder="••••••••"
+                        value={passwordForm.newPassword}
+                        onChange={e => setPasswordForm({...passwordForm, newPassword: e.target.value})}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Conferma Nuova Password</label>
+                      <input 
+                        type="password"
+                        required
+                        className="w-full px-5 py-3 border border-slate-200 focus:ring-2 focus:ring-brand outline-none text-sm shadow-sm"
+                        placeholder="••••••••"
+                        value={passwordForm.confirmPassword}
+                        onChange={e => setPasswordForm({...passwordForm, confirmPassword: e.target.value})}
+                      />
+                    </div>
+                  </div>
+                </div>
               </div>
-              <button className="bg-slate-900 text-white px-8 py-3.5 font-bold text-sm hover:bg-slate-800 transition-all uppercase tracking-widest shadow-lg">
-                Invia Link Reset
+              
+              <button 
+                type="submit"
+                disabled={isChangingPassword}
+                className="w-full bg-slate-900 text-white px-8 py-3.5 font-bold text-sm hover:bg-slate-800 transition-all uppercase tracking-widest shadow-lg disabled:opacity-50"
+              >
+                {isChangingPassword ? 'Aggiornamento...' : 'Aggiorna Password'}
               </button>
-            </div>
+            </form>
           </div>
         </div>
       </div>
